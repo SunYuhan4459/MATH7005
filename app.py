@@ -113,3 +113,4 @@ with col2:
         st.dataframe(recommended_districts[display_cols].reset_index(drop=True), use_container_width=True)
     else:
         st.info("Waiting for valid criteria...")
+        
