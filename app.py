@@ -124,5 +124,6 @@ with col2:
             ),
         },
         hide_index=True, # 隐藏最左边难看的 0,1,2,3 索引号
-        use_container_width=True # 让表格自动撑满右侧栏宽度)
+        use_container_width=True # 让表格自动撑满右侧栏宽度
+        )
         st.info("Waiting for valid criteria...")
