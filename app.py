@@ -78,6 +78,37 @@ def get_recommendations(data, min_age, min_inc, max_comp):
         filtered["Recommendation Score"] = (age_score + income_score + cost_score).round(2)
         filtered = filtered.sort_values(by="Recommendation Score", ascending=False)
     return filtered
+# === 新增：纯手写 K-Means 机器学习算法 ===
+import numpy as np
+
+def min_max_scale(series):
+    return (series - series.min()) / (series.max() - series.min())
+
+def custom_kmeans(data_matrix, k=3, max_iters=100):
+    np.random.seed(42)
+    centroids = data_matrix[np.random.choice(data_matrix.shape[0], k, replace=False)]
+    for _ in range(max_iters):
+        distances = np.linalg.norm(data_matrix[:, np.newaxis] - centroids, axis=2)
+        labels = np.argmin(distances, axis=1)
+        new_centroids = np.array([
+            data_matrix[labels == i].mean(axis=0) if np.sum(labels == i) > 0 else centroids[i] 
+            for i in range(k)
+        ])
+        if np.all(centroids == new_centroids):
+            break
+        centroids = new_centroids
+    return labels
+
+# 提取特征进行聚类 (如果你的总人口列名不是 t_pop，请修改)
+f1 = min_max_scale(df['t_pop']).values
+f2 = min_max_scale(df['年轻客群占比(%)']).values
+X_matrix = np.column_stack((f1, f2))
+
+# 运行聚类并打上商业标签
+cluster_labels = custom_kmeans(X_matrix, k=3)
+cluster_mapping = {0: "💎 核心高潜区", 1: "⭐ 稳健发展区", 2: "⚠️ 观察培育区"}
+df['商业潜力评级'] = [cluster_mapping[label] for label in cluster_labels]
+# ==========================================
 
 recommended_districts = get_recommendations(df, min_age_ratio, min_income, max_competitors)
 
@@ -121,7 +152,7 @@ with col2:
     st.subheader("📊 Top Recommendations")
     if not recommended_districts.empty:
     # 假设你想展示这两个核心列，你可以根据需要增减
-     display_cols = ["行政区", "Recommendation Score"] 
+     display_cols = ["行政区", "Recommendation Score", "商业潜力评级"]
     
     st.dataframe(
         recommended_districts[display_cols].reset_index(drop=True),
