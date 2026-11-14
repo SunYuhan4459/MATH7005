@@ -110,7 +110,7 @@ with col2:
     st.subheader("📊 Top Recommendations")
     if not recommended_districts.empty:
     # 假设你想展示这两个核心列，你可以根据需要增减
-    display_cols = ["行政区", "Recommendation Score"] 
+     display_cols = ["行政区", "Recommendation Score"] 
     
     st.dataframe(
         recommended_districts[display_cols].reset_index(drop=True),
