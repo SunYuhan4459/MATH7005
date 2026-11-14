@@ -100,7 +100,7 @@ def custom_kmeans(data_matrix, k=3, max_iters=100):
     return labels
 
 # 提取特征进行聚类 (如果你的总人口列名不是 t_pop，请修改)
-f1 = min_max_scale(df['t_pop']).values
+f1 = min_max_scale(df['总人口']).values
 f2 = min_max_scale(df['年轻客群占比(%)']).values
 X_matrix = np.column_stack((f1, f2))
 
