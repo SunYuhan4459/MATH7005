@@ -89,17 +89,28 @@ with col1:
     m = folium.Map(location=[22.3193, 114.1694], zoom_start=11, tiles="OpenStreetMap")
     
     if not recommended_districts.empty:
-        folium.Choropleth(
+        # 1. 把 Choropleth 赋值给变量 choro
+        choro = folium.Choropleth(
             geo_data=hk_geojson,
             name="choropleth",
             data=recommended_districts,
-            columns=["GeoJSON_Name", "Recommendation Score"], 
+            columns=["GeoJSON_Name", "Recommendation Score"],
             key_on="feature.properties.name",
             fill_color="YlOrRd",
             fill_opacity=0.7,
             line_opacity=0.2,
             legend_name="Recommendation Score"
-        ).add_to(m)
+        )
+        choro.add_to(m)
+        
+        # 2. 为它添加悬浮提示（Tooltip）
+        choro.geojson.add_child(
+            folium.features.GeoJsonTooltip(
+                fields=['name'], 
+                aliases=['行政区: '],
+                style=("background-color: white; color: #333333; font-family: arial; font-size: 14px; padding: 8px;")
+            )
+        )
     else:
         st.warning("No districts meet your strict criteria. Try adjusting the sliders.")
 
