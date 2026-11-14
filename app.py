@@ -109,7 +109,20 @@ with col1:
 with col2:
     st.subheader("📊 Top Recommendations")
     if not recommended_districts.empty:
-        display_cols = ["行政区", "Recommendation Score", "区位成本指数_月租(HKD)", "同类竞品密度(家)"]
-        st.dataframe(recommended_districts[display_cols].reset_index(drop=True), use_container_width=True)
-    else:
+    # 假设你想展示这两个核心列，你可以根据需要增减
+    display_cols = ["行政区", "Recommendation Score"] 
+    
+    st.dataframe(
+        recommended_districts[display_cols].reset_index(drop=True),
+        column_config={
+            "Recommendation Score": st.column_config.ProgressColumn(
+                "推荐综合得分", # 显示在表头的名字
+                help="基于人口、收入与竞品密度的综合计算结果",
+                format="%.2f",
+                min_value=0,   # 进度条的最小值
+                max_value=100, # 进度条的最大值
+            ),
+        },
+        hide_index=True, # 隐藏最左边难看的 0,1,2,3 索引号
+        use_container_width=True # 让表格自动撑满右侧栏宽度)
         st.info("Waiting for valid criteria...")
