@@ -86,7 +86,7 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     st.subheader("📍 Recommended Locations Map")
-    m = folium.Map(location=[22.3193, 114.1694], zoom_start=11, tiles="CartoDB positron")
+    m = folium.Map(location=[22.3193, 114.1694], zoom_start=11, tiles="OpenStreetMap")
     
     if not recommended_districts.empty:
         folium.Choropleth(
@@ -113,4 +113,3 @@ with col2:
         st.dataframe(recommended_districts[display_cols].reset_index(drop=True), use_container_width=True)
     else:
         st.info("Waiting for valid criteria...")
-        
