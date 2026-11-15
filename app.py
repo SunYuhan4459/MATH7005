@@ -167,14 +167,8 @@ with tab1:
     with col1:
         st.subheader("選址分佈地圖" if is_zh else "Locations Map")
         
-        # 使用地政总署CSDI公开底图接口
-        hk_gov_tiles = "https://mapapi.geodata.gov.hk/gs/api/v1.0.0/bgm/wmts?service=WMTS&request=GetTile&version=1.0.0&layer=basemap&style=default&tileMatrixSet=HKSPSG&tileMatrix={z}&tileRow={y}&tileCol={x}&format=image/png"
-        m = folium.Map(
-            location=[22.3193, 114.1694],
-            zoom_start=11,
-            tiles=hk_gov_tiles,
-            attr="Lands Department"
-        )
+        # 使用 OpenStreetMap 底图
+        m = folium.Map(location=[22.3193, 114.1694], zoom_start=11, tiles="OpenStreetMap")
 
         if not recommended_districts.empty:
             choro = folium.Choropleth(
