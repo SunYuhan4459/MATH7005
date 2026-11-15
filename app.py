@@ -16,10 +16,10 @@ is_zh = (lang == "繁體中文")
 
 if is_zh:
     st.title("🧋 TeaLocation HK - 智能商業選址系統")
-    st.markdown("基於香港人口結構（15-65歲+）、家庭收入與競品密度的選址推薦與 K-Means 聚類平台")
+    st.markdown("基於多準則決策 (MCDA)、K-Means 聚類與基於內容的推薦系統 (Content-Based Recommendation)")
 else:
     st.title("🧋 TeaLocation HK - Smart Site Selection Platform")
-    st.markdown("Site selection and K-Means clustering based on HK demographics, household income, and competitor density")
+    st.markdown("Site selection utilizing MCDA, K-Means clustering, and Content-Based Recommendation")
 
 # 2. 核心数据读取与清洗
 @st.cache_data
@@ -37,19 +37,14 @@ def load_and_process_data():
     df = raw_df.iloc[4:22].copy()
     df.columns = [str(c).strip() for c in raw_df.iloc[3].values]
 
-    # 选取基础列与4个年龄区间 (age_2: 15-24, age_3: 25-44, age_4: 45-64, age_5: 65+)
-    cols = ['dc_eng', 'dc_chi', 't_pop', 'age_2', 'age_3', 'age_4', 'age_5', 'ma_hh', 'dm_r']
+    cols = ['dc_eng', 'dc_chi', 't_pop', 'age_1', 'age_2', 'age_3', 'age_4', 'age_5', 'ma_hh', 'dm_r']
     df_clean = pd.DataFrame()
     for col in cols:
-        if col in df.columns:
-            df_clean[col] = df[col]
-        else:
-            df_clean[col] = 0
+        df_clean[col] = df[col] if col in df.columns else 0
 
     for col in ['t_pop', 'age_2', 'age_3', 'age_4', 'age_5', 'ma_hh', 'dm_r']:
         df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce').fillna(0)
 
-    # 计算4个年龄段各自的百分比
     df_clean['15-24'] = ((df_clean['age_2'] / df_clean['t_pop']) * 100).round(2)
     df_clean['25-44'] = ((df_clean['age_3'] / df_clean['t_pop']) * 100).round(2)
     df_clean['45-64'] = ((df_clean['age_4'] / df_clean['t_pop']) * 100).round(2)
@@ -57,7 +52,6 @@ def load_and_process_data():
 
     matrix = pd.merge(df_clean, comp_df, left_on='dc_eng', right_on='Standard_District', how='left')
 
-    # 繁体中文名称映射（用于界面表格显示）
     zh_map = {
         'Central and Western': '中西區', 'Wan Chai': '灣仔區', 'Eastern': '東區',
         'Southern': '南區', 'Yau Tsim Mong': '油尖旺區', 'Sham Shui Po': '深水埗區',
@@ -66,7 +60,6 @@ def load_and_process_data():
         'Yuen Long': '元朗區', 'North': '北區', 'Tai Po': '大埔區',
         'Sha Tin': '沙田區', 'Sai Kung': '西貢區', 'Islands': '離島區'
     }
-    # 地图底图匹配专用字典（保持与 geojson 文件一致）
     geojson_name_map = {
         'Central and Western': '中西区', 'Wan Chai': '湾仔区', 'Eastern': '东区',
         'Southern': '南区', 'Yau Tsim Mong': '油尖旺区', 'Sham Shui Po': '深水埗区',
@@ -79,6 +72,7 @@ def load_and_process_data():
     matrix["District_ZH"] = matrix["dc_eng"].map(zh_map)
     matrix["District_EN"] = matrix["dc_eng"]
     matrix["GeoJSON_Name"] = matrix["dc_eng"].map(geojson_name_map)
+    matrix["Display_District"] = matrix["District_ZH"] if is_zh else matrix["District_EN"]
 
     with open("hk_districts.geojson", "r", encoding="utf-8") as f:
         geojson = json.load(f)
@@ -87,7 +81,7 @@ def load_and_process_data():
 
 df, hk_geojson = load_and_process_data()
 
-# 3. 侧边栏：筛选条件设置（纯数字区间与档位）
+# 3. 侧边栏：基础筛选条件
 st.sidebar.header("🎯 篩選條件設定" if is_zh else "🎯 Filter Criteria")
 
 age_groups = st.sidebar.multiselect(
@@ -98,12 +92,12 @@ age_groups = st.sidebar.multiselect(
 if not age_groups:
     age_groups = ['25-44']
 
-# 将勾选的年龄段占比相加
 df['Selected_Age_Ratio'] = df[age_groups].sum(axis=1).round(2)
+df['Age_Rank'] = df['Selected_Age_Ratio'].rank(method='min', ascending=False)
 
-min_age_ratio = st.sidebar.slider(
-    "所選年齡合計最低佔比 (%)" if is_zh else "Min. Selected Age Ratio (%)",
-    min_value=10.0, max_value=85.0, value=50.0, step=1.0
+top_n_districts = st.sidebar.slider(
+    "1. 保留客群佔比排名前 N 的行政區" if is_zh else "1. Top N Districts by Age Ratio",
+    min_value=1, max_value=18, value=18, step=1
 )
 
 min_income = st.sidebar.select_slider(
@@ -117,7 +111,7 @@ max_competitors = st.sidebar.slider(
     min_value=80, max_value=700, value=500, step=10
 )
 
-# 4. 手写 K-Means 聚类算法（不使用 sklearn）
+# 4. 手写算法库 (Min-Max, K-Means, Cosine Similarity) 不依赖 sklearn
 def min_max_scale(series):
     return (series - series.min()) / (series.max() - series.min())
 
@@ -136,94 +130,113 @@ def custom_kmeans(data_matrix, k=3, max_iters=100):
         centroids = new_centroids
     return labels
 
-# 提取总人口与所选年龄占比进行聚类
+def cosine_similarity(v1, v2):
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
+
+# 运行聚类
 f1 = min_max_scale(df['t_pop']).values
 f2 = min_max_scale(df['Selected_Age_Ratio']).values
 X_matrix = np.column_stack((f1, f2))
-
 cluster_labels = custom_kmeans(X_matrix, k=3)
 df['Cluster'] = [f"Cluster {label + 1}" for label in cluster_labels]
-df['Display_District'] = df['District_ZH'] if is_zh else df['District_EN']
 
-# 5. 综合推荐得分计算（40% 年龄 + 40% 收入 + 20% 租金成本）
-def get_recommendations(data, min_age, min_inc, max_comp):
-    filtered = data[
-        (data["Selected_Age_Ratio"] >= min_age) &
-        (data["ma_hh"] >= min_inc) &
-        (data["Competitors"] <= max_comp)
-    ].copy()
+# 5. UI 构建：引入标签页 (Tabs)
+tab1, tab2 = st.tabs(["📊 綜合選址分析 (MCDA)", "🤖 智能商圈推薦系統 (Recommendation System)"])
 
-    if not filtered.empty:
-        age_score = (filtered["Selected_Age_Ratio"] / data["Selected_Age_Ratio"].max()) * 40
-        income_score = (filtered["ma_hh"] / data["ma_hh"].max()) * 40
-        cost_score = (1 - (filtered["dm_r"] / data["dm_r"].max())) * 20
-        filtered["Recommendation Score"] = (age_score + income_score + cost_score).round(2)
-        filtered = filtered.sort_values(by="Recommendation Score", ascending=False)
-    return filtered
+# ====== 标签页 1：综合筛选与排名 ======
+with tab1:
+    def get_recommendations(data, top_n, min_inc, max_comp):
+        filtered = data[
+            (data["Age_Rank"] <= top_n) &
+            (data["ma_hh"] >= min_inc) &
+            (data["Competitors"] <= max_comp)
+        ].copy()
 
-recommended_districts = get_recommendations(df, min_age_ratio, min_income, max_competitors)
+        if not filtered.empty:
+            age_score = (filtered["Selected_Age_Ratio"] / data["Selected_Age_Ratio"].max()) * 40
+            income_score = (filtered["ma_hh"] / data["ma_hh"].max()) * 40
+            cost_score = (1 - (filtered["dm_r"] / data["dm_r"].max())) * 20
+            filtered["Recommendation Score"] = (age_score + income_score + cost_score).round(2)
+            filtered = filtered.sort_values(by="Recommendation Score", ascending=False)
+        return filtered
 
-# 6. 地图与数据表格展示（还原 OpenStreetMap 干净效果）
-col1, col2 = st.columns([1.8, 1.2])
+    recommended_districts = get_recommendations(df, top_n_districts, min_income, max_competitors)
 
-with col1:
-    st.subheader("📍 推薦選址地圖" if is_zh else "📍 Recommended Locations Map")
-    # 还原之前的 OpenStreetMap，彻底去掉 API KEY 水印
-    m = folium.Map(location=[22.3193, 114.1694], zoom_start=11, tiles="OpenStreetMap")
-
-    if not recommended_districts.empty:
-        choro = folium.Choropleth(
-            geo_data=hk_geojson,
-            name="choropleth",
-            data=recommended_districts,
-            columns=["GeoJSON_Name", "Recommendation Score"],
-            key_on="feature.properties.name",
-            fill_color="YlOrRd",
-            fill_opacity=0.7,
-            line_opacity=0.2,
-            legend_name="Recommendation Score"
-        )
-        choro.add_to(m)
-
-        choro.geojson.add_child(
-            folium.features.GeoJsonTooltip(
-                fields=['name'],
-                aliases=['行政區: ' if is_zh else 'District: '],
-                style="background-color: white; color: #333333; font-family: arial; font-size: 14px; padding: 8px;"
+    col1, col2 = st.columns([1.8, 1.2])
+    with col1:
+        st.subheader("📍 推薦選址地圖" if is_zh else "📍 Recommended Locations Map")
+        m = folium.Map(location=[22.3193, 114.1694], zoom_start=11, tiles="OpenStreetMap")
+        if not recommended_districts.empty:
+            choro = folium.Choropleth(
+                geo_data=hk_geojson,
+                name="choropleth",
+                data=recommended_districts,
+                columns=["GeoJSON_Name", "Recommendation Score"],
+                key_on="feature.properties.name",
+                fill_color="YlOrRd",
+                fill_opacity=0.7,
+                line_opacity=0.2,
+                legend_name="Recommendation Score"
             )
-        )
-    else:
-        st.warning("暫無符合條件的行政區，請調低左側篩選門檻。" if is_zh else "No districts meet your criteria. Try adjusting the sliders.")
+            choro.add_to(m)
+            choro.geojson.add_child(folium.features.GeoJsonTooltip(fields=['name'], aliases=['行政區: ' if is_zh else 'District: '], style="background-color: white; color: #333333; font-size: 14px; padding: 8px;"))
+        else:
+            st.warning("暫無符合條件的行政區。" if is_zh else "No districts meet your criteria.")
+        components.html(m._repr_html_(), height=500)
 
-    components.html(m._repr_html_(), height=500)
+    with col2:
+        st.subheader("📊 推薦行政區排名" if is_zh else "📊 Top Recommendations")
+        if not recommended_districts.empty:
+            show_df = recommended_districts[["Display_District", "Recommendation Score", "Cluster", "Selected_Age_Ratio", "ma_hh"]].reset_index(drop=True)
+            show_df.columns = ["行政區" if is_zh else "District", "推薦綜合得分" if is_zh else "Score", "聚類分組" if is_zh else "Cluster", "年齡佔比(%)" if is_zh else "Age Ratio(%)", "家庭月入(HKD)" if is_zh else "Income(HKD)"]
+            st.dataframe(show_df, column_config={("推薦綜合得分" if is_zh else "Score"): st.column_config.ProgressColumn(format="%.2f", min_value=0, max_value=100)}, hide_index=True, use_container_width=True)
+        else:
+            st.info("請在左側放寬篩選條件。" if is_zh else "Please relax the filter criteria on the left.")
 
-with col2:
-    st.subheader("📊 推薦行政區排名" if is_zh else "📊 Top Recommendations")
-    if not recommended_districts.empty:
-        show_df = recommended_districts[[
-            "Display_District", "Recommendation Score", "Cluster", "Selected_Age_Ratio", "ma_hh"
-        ]].reset_index(drop=True)
-
-        col_name_dist = "行政區" if is_zh else "District"
-        col_name_score = "推薦綜合得分" if is_zh else "Score"
-        col_name_cluster = "聚類分組" if is_zh else "Cluster"
-        col_name_age = "年齡佔比(%)" if is_zh else "Age Ratio(%)"
-        col_name_inc = "家庭月入(HKD)" if is_zh else "Income(HKD)"
-
-        show_df.columns = [col_name_dist, col_name_score, col_name_cluster, col_name_age, col_name_inc]
-
+# ====== 标签页 2：基于内容的推荐系统 (Content-Based Recommendation) ======
+with tab2:
+    st.subheader("🤖 基於內容的相似商圈推薦系統" if is_zh else "🤖 Content-Based District Recommendation System")
+    st.markdown("輸入一個您認為成功的基準商圈，系統將基於底層特徵向量（年齡結構、家庭收入、租金成本、競品密度），計算 **餘弦相似度 (Cosine Similarity)**，為您推薦 3 個商業環境最相似的潛在拓展區域。" if is_zh else "Select a benchmark district, and the system will recommend the top 3 most similar districts using **Cosine Similarity** across demographic and economic feature vectors.")
+    
+    # 提取特征矩阵并归一化
+    f_age = min_max_scale(df['Selected_Age_Ratio']).values
+    f_inc = min_max_scale(df['ma_hh']).values
+    f_rent = min_max_scale(df['dm_r']).values
+    f_comp = min_max_scale(df['Competitors']).values
+    feature_matrix = np.column_stack((f_age, f_inc, f_rent, f_comp))
+    
+    # 用户选择基准商圈
+    target_district = st.selectbox("🎯 選擇您的基準成功商圈 / Select Benchmark District:", df['Display_District'].tolist())
+    
+    if target_district:
+        target_idx = df[df['Display_District'] == target_district].index[0]
+        target_vector = feature_matrix[target_idx]
+        
+        # 计算余弦相似度
+        similarities = []
+        for i in range(len(feature_matrix)):
+            if i == target_idx:
+                similarities.append(0.0) # 排除自己
+            else:
+                sim = cosine_similarity(target_vector, feature_matrix[i])
+                similarities.append(sim)
+                
+        df['Similarity'] = np.array(similarities) * 100 # 转为百分比得分
+        
+        # 获取 Top 3 推荐
+        top3_df = df.sort_values(by='Similarity', ascending=False).head(3).reset_index(drop=True)
+        
+        st.success(f"與 **{target_district}** 最相似的 3 個拓展區域如下：" if is_zh else f"Top 3 similar districts to **{target_district}**:")
+        
+        col_names = ["相似度得分" if is_zh else "Similarity Score", "推薦行政區" if is_zh else "Recommended District", "年齡佔比(%)" if is_zh else "Age Ratio(%)", "家庭月入(HKD)" if is_zh else "Income(HKD)", "競品數量" if is_zh else "Competitors"]
+        rec_show = top3_df[["Similarity", "Display_District", "Selected_Age_Ratio", "ma_hh", "Competitors"]]
+        rec_show.columns = col_names
+        
         st.dataframe(
-            show_df,
+            rec_show,
             column_config={
-                col_name_score: st.column_config.ProgressColumn(
-                    col_name_score,
-                    format="%.2f",
-                    min_value=0,
-                    max_value=100,
-                )
+                col_names[0]: st.column_config.ProgressColumn(format="%.1f%%", min_value=0, max_value=100)
             },
             hide_index=True,
             use_container_width=True
         )
-    else:
-        st.info("請在左側放寬篩選條件。" if is_zh else "Please relax the filter criteria on the left.")
