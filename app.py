@@ -167,7 +167,12 @@ f1 = min_max_scale(df['t_pop']).values
 f2 = min_max_scale(df['Selected_Age_Ratio']).values
 X_matrix = np.column_stack((f1, f2))
 cluster_labels = custom_kmeans(X_matrix, k=3)
-df['Cluster'] = [f"Cluster {label + 1}" for label in cluster_labels]
+
+# 根据语言环境动态分配标签名称
+if is_zh:
+    df['Cluster'] = [f"梯隊 {label + 1}" for label in cluster_labels]
+else:
+    df['Cluster'] = [f"Tier {label + 1}" for label in cluster_labels]
 
 # ==========================================
 # 5. 渲染页面主体面板
