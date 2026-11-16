@@ -64,17 +64,26 @@ def load_and_process_data():
     # 整合人口数据与竞品数据
     matrix = pd.merge(df_clean, comp_df, left_on='dc_eng', right_on='Standard_District', how='left')
 
-    # 字典映射，用于前台显示和 GeoJSON 匹配
+    # 字典映射，用于前台显示和 GeoJSON 匹配，同时支持繁体中文和标准英文名称
     zh_map = {
         'Central and Western': '中西區', 'Wan Chai': '灣仔區', 'Eastern': '東區',
         'Southern': '南區', 'Yau Tsim Mong': '油尖旺區', 'Sham Shui Po': '深水埗區',
         'Kowloon City': '九龍城區', 'Wong Tai Sin': '黃大仙區', 'Kwun Tong': '觀塘區',
         'Kwai Tsing': '葵青區', 'Tsuen Wan': '荃灣區', 'Tuen Mun': '屯門區',
         'Yuen Long': '元朗區', 'North': '北區', 'Tai Po': '大埔區',
-        'Sha Tin': '沙田區', 'Sai Kung': '西貢區', 'Islands': '離島區'
+        'Sha Tin': '沙田區', 'Sai Kung': '西貢區', 'Islands': 'Islands' # 确保英文也有
     }
     
-    # 对应 GeoJSON 内部的简体区名字段
+    # 英文名称直接使用标准英文
+    en_map = {
+        'Central and Western': 'Central and Western', 'Wan Chai': 'Wan Chai', 'Eastern': 'Eastern',
+        'Southern': 'Southern', 'Yau Tsim Mong': 'Yau Tsim Mong', 'Sham Shui Po': 'Sham Shui Po',
+        'Kowloon City': 'Kowloon City', 'Wong Tai Sin': 'Wong Tai Sin', 'Kwun Tong': 'Kwun Tong',
+        'Kwai Tsing': 'Kwai Tsing', 'Tsuen Wan': 'Tsuen Wan', 'Tuen Mun': 'Tuen Mun',
+        'Yuen Long': 'Yuen Long', 'North': 'North', 'Tai Po': 'Tai Po',
+        'Sha Tin': 'Sha Tin', 'Sai Kung': 'Sai Kung', 'Islands': 'Islands'
+    }
+    
     geojson_name_map = {
         'Central and Western': '中西区', 'Wan Chai': '湾仔区', 'Eastern': '东区',
         'Southern': '南区', 'Yau Tsim Mong': '油尖旺区', 'Sham Shui Po': '深水埗区',
@@ -83,6 +92,13 @@ def load_and_process_data():
         'Yuen Long': '元朗区', 'North': '北区', 'Tai Po': '大埔区',
         'Sha Tin': '沙田区', 'Sai Kung': '西贡区', 'Islands': '离岛区'
     }
+
+    matrix["District_ZH"] = matrix["dc_eng"].map(zh_map)
+    matrix["District_EN"] = matrix["dc_eng"].map(en_map)
+    matrix["GeoJSON_Name"] = matrix["dc_eng"].map(geojson_name_map)
+    
+    # 【核心修复】这里根据 is_zh 变量动态切换显示中文还是英文区名
+    matrix["Display_District"] = matrix["District_ZH"] if is_zh else matrix["District_EN"]
 
     matrix["District_ZH"] = matrix["dc_eng"].map(zh_map)
     matrix["District_EN"] = matrix["dc_eng"]
