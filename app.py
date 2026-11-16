@@ -242,7 +242,14 @@ with tab1:
         st.subheader("行政區排名" if is_zh else "District Ranking")
         if not recommended_districts.empty:
             show_df = recommended_districts[["Display_District", "Recommendation Score", "Cluster", "Selected_Age_Ratio", "ma_hh"]].reset_index(drop=True)
-            show_df.columns = ["行政區" if is_zh else "District", "綜合得分" if is_zh else "Score", "聚類" if is_zh else "Cluster", "年齡佔比(%)" if is_zh else "Age Ratio(%)", "家庭月入(HKD)" if is_zh else "Income(HKD)"]
+            show_df.columns = [
+                "行政區" if is_zh else "District", 
+                "綜合得分" if is_zh else "Score", 
+                "聚類梯隊" if is_zh else "Tier", 
+                "年齡佔比(%)" if is_zh else "Age Ratio(%)", 
+                "家庭月入(HKD)" if is_zh else "Income(HKD)"
+            ]
+            
             st.dataframe(
                 show_df,
                 column_config={("綜合得分" if is_zh else "Score"): st.column_config.ProgressColumn(format="%.2f", min_value=0, max_value=100)},
@@ -286,7 +293,14 @@ with tab2:
         
         st.write(f"與 **{target_district}** 最相似的 3 個區域：" if is_zh else f"Top 3 similar districts to **{target_district}**:")
         
-        col_names = ["相似度" if is_zh else "Similarity", "行政區" if is_zh else "District", "年齡佔比(%)" if is_zh else "Age Ratio(%)", "家庭月入(HKD)" if is_zh else "Income(HKD)", "競品數量" if is_zh else "Competitors"]
+       # 【已修改】这里针对 Tab 2 的推荐表头进行中英文动态适配
+        col_names = [
+            "相似度" if is_zh else "Similarity", 
+            "行政區" if is_zh else "District", 
+            "年齡佔比(%)" if is_zh else "Age Ratio(%)", 
+            "家庭月入(HKD)" if is_zh else "Income(HKD)", 
+            "競品數量" if is_zh else "Competitors"
+        ]
         rec_show = top3_df[["Similarity", "Display_District", "Selected_Age_Ratio", "ma_hh", "Competitors"]]
         rec_show.columns = col_names
         
