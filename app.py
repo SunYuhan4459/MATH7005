@@ -177,7 +177,10 @@ else:
 # ==========================================
 # 5. 渲染页面主体面板
 # ==========================================
-tab1, tab2 = st.tabs(["選址綜合評分 (MCDA)", "相似商圈推薦 (Recommendation)"])
+if is_zh:
+    tab1, tab2 = st.tabs(["選址綜合評分 (MCDA)", "相似商圈推薦 (Recommendation)"])
+else:
+    tab1, tab2 = st.tabs(["MCDA Score", "Similar District Recommendation"])
 
 # ------------------------------------
 # 面板 1: MCDA 综合评分与热力图
