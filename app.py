@@ -123,18 +123,18 @@ df['Selected_Age_Ratio'] = df[age_groups].sum(axis=1).round(2)
 df['Age_Rank'] = df['Selected_Age_Ratio'].rank(method='min', ascending=False)
 
 top_n_districts = st.sidebar.slider(
-    "2. 按年齡佔比保留前 N 個區" if is_zh else "1. Top N Districts by Age Ratio",
+    "2. 按年齡佔比保留前 N 個區" if is_zh else "2. Top N Districts by Age Ratio",
     min_value=1, max_value=18, value=18, step=1
 )
 
 min_income = st.sidebar.select_slider(
-    "3. 家庭月入中位數下限 (HKD)" if is_zh else "2. Min. Monthly Income (HKD)",
+    "3. 家庭月入中位數下限 (HKD)" if is_zh else "3. Min. Monthly Income (HKD)",
     options=[20000, 28000, 35000, 42000],
     value=28000
 )
 
 max_competitors = st.sidebar.slider(
-    "4. 競品數量上限 (家)" if is_zh else "3. Max. Competitors",
+    "4. 競品數量上限 (家)" if is_zh else "4. Max. Competitors",
     min_value=80, max_value=700, value=500, step=10
 )
 
